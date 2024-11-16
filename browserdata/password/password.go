@@ -3,7 +3,6 @@ package password
 import (
 	"database/sql"
 	"encoding/base64"
-	"log/slog"
 	"os"
 	"sort"
 	"time"
@@ -13,6 +12,7 @@ import (
 
 	"github.com/moond4rk/hackbrowserdata/crypto"
 	"github.com/moond4rk/hackbrowserdata/extractor"
+	"github.com/moond4rk/hackbrowserdata/log"
 	"github.com/moond4rk/hackbrowserdata/types"
 	"github.com/moond4rk/hackbrowserdata/utils/typeutil"
 )
@@ -65,23 +65,24 @@ func (c *ChromiumPassword) Extract(masterKey []byte) error {
 			create        int64
 		)
 		if err := rows.Scan(&url, &username, &pwd, &create); err != nil {
-			slog.Error("scan chromium password error", "err", err)
+			log.Debugf("scan chromium password error: %v", err)
 		}
 		login := loginData{
 			UserName:    username,
 			encryptPass: pwd,
 			LoginURL:    url,
 		}
+
 		if len(pwd) > 0 {
-			if len(masterKey) == 0 {
-				password, err = crypto.DecryptWithDPAPI(pwd)
-			} else {
-				password, err = crypto.DecryptWithChromium(masterKey, pwd)
-			}
+			password, err = crypto.DecryptWithDPAPI(pwd)
 			if err != nil {
-				slog.Error("decrypt chromium password error", "err", err)
+				password, err = crypto.DecryptWithChromium(masterKey, pwd)
+				if err != nil {
+					log.Debugf("decrypt chromium password error: %v", err)
+				}
 			}
 		}
+
 		if create > time.Now().Unix() {
 			login.CreateDate = typeutil.TimeEpoch(create)
 		} else {
@@ -132,7 +133,7 @@ func (c *YandexPassword) Extract(masterKey []byte) error {
 			create        int64
 		)
 		if err := rows.Scan(&url, &username, &pwd, &create); err != nil {
-			slog.Error("scan yandex password error", "err", err)
+			log.Debugf("scan yandex password error: %v", err)
 		}
 		login := loginData{
 			UserName:    username,
@@ -147,7 +148,7 @@ func (c *YandexPassword) Extract(masterKey []byte) error {
 				password, err = crypto.DecryptWithChromium(masterKey, pwd)
 			}
 			if err != nil {
-				slog.Error("decrypt yandex password error", "err", err)
+				log.Debugf("decrypt yandex password error: %v", err)
 			}
 		}
 		if create > time.Now().Unix() {

@@ -2,7 +2,6 @@ package cookie
 
 import (
 	"database/sql"
-	"log/slog"
 	"os"
 	"sort"
 	"time"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/moond4rk/hackbrowserdata/crypto"
 	"github.com/moond4rk/hackbrowserdata/extractor"
+	"github.com/moond4rk/hackbrowserdata/log"
 	"github.com/moond4rk/hackbrowserdata/types"
 	"github.com/moond4rk/hackbrowserdata/utils/typeutil"
 )
@@ -65,7 +65,7 @@ func (c *ChromiumCookie) Extract(masterKey []byte) error {
 			value, encryptValue                           []byte
 		)
 		if err = rows.Scan(&key, &encryptValue, &host, &path, &createDate, &expireDate, &isSecure, &isHTTPOnly, &hasExpire, &isPersistent); err != nil {
-			slog.Error("scan chromium cookie error", "err", err)
+			log.Debugf("scan chromium cookie error: %v", err)
 		}
 
 		cookie := cookie{
@@ -80,16 +80,17 @@ func (c *ChromiumCookie) Extract(masterKey []byte) error {
 			CreateDate:   typeutil.TimeEpoch(createDate),
 			ExpireDate:   typeutil.TimeEpoch(expireDate),
 		}
+
 		if len(encryptValue) > 0 {
-			if len(masterKey) == 0 {
-				value, err = crypto.DecryptWithDPAPI(encryptValue)
-			} else {
-				value, err = crypto.DecryptWithChromium(masterKey, encryptValue)
-			}
+			value, err = crypto.DecryptWithDPAPI(encryptValue)
 			if err != nil {
-				slog.Error("decrypt chromium cookie error", "err", err)
+				value, err = crypto.DecryptWithChromium(masterKey, encryptValue)
+				if err != nil {
+					log.Debugf("decrypt chromium cookie error: %v", err)
+				}
 			}
 		}
+
 		cookie.Value = string(value)
 		*c = append(*c, cookie)
 	}
@@ -133,7 +134,7 @@ func (f *FirefoxCookie) Extract(_ []byte) error {
 			creationTime, expiry    int64
 		)
 		if err = rows.Scan(&name, &value, &host, &path, &creationTime, &expiry, &isSecure, &isHTTPOnly); err != nil {
-			slog.Error("scan firefox cookie error", "err", err)
+			log.Debugf("scan firefox cookie error: %v", err)
 		}
 		*f = append(*f, cookie{
 			KeyName:    name,
